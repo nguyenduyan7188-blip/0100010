@@ -161,6 +161,19 @@ build_package() {
     cp Layout/var/jb/Library/MobileSubstrate/DynamicLibraries/*.plist \
        "${STAGE}/var/jb/Library/MobileSubstrate/DynamicLibraries/"
 
+    # Add a safe post-install script that never hard-fails if respring helpers are missing
+    cat > "${STAGE}/DEBIAN/postinst" <<'EOF'
+#!/bin/sh
+echo "VcamLumiere installed."
+if command -v sbreload >/dev/null 2>&1; then
+    sbreload || true
+elif command -v killall >/dev/null 2>&1; then
+    killall -9 SpringBoard >/dev/null 2>&1 || true
+fi
+exit 0
+EOF
+    chmod 755 "${STAGE}/DEBIAN/postinst"
+
     # Build .deb
     dpkg-deb -Zxz --build "${STAGE}" "${OUTDIR}/com.lumiere.vcamlumiere_2.0.0_iphoneos-arm64.deb"
 

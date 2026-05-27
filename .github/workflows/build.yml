@@ -157,11 +157,17 @@ jobs:
           cp build/VcamLumiereUI.dylib     "$STAGE/var/jb/Library/MobileSubstrate/DynamicLibraries/"
           cp Layout/var/jb/Library/MobileSubstrate/DynamicLibraries/*.plist \
              "$STAGE/var/jb/Library/MobileSubstrate/DynamicLibraries/"
-          echo '#!/bin/bash' > "$STAGE/DEBIAN/postinst"
-          echo 'echo "VcamLumiere installed. Please respring to activate."' >> "$STAGE/DEBIAN/postinst"
+          cat > "$STAGE/DEBIAN/postinst" <<'EOF'
+          #!/bin/sh
+          echo "VcamLumiere installed."
+          if command -v sbreload >/dev/null 2>&1; then
+            sbreload || true
+          elif command -v killall >/dev/null 2>&1; then
+            killall -9 SpringBoard >/dev/null 2>&1 || true
+          fi
+          exit 0
+          EOF
           chmod 755 "$STAGE/DEBIAN/postinst"
-          echo 'SBReloadSpringBoard' > "$STAGE/DEBIAN/extrainst_"
-          chmod 755 "$STAGE/DEBIAN/extrainst_"
           DEB_NAME="${PACKAGE_NAME}_${PACKAGE_VERSION}_${PACKAGE_ARCH}.deb"
           dpkg-deb -Zxz --root-owner-group --build "$STAGE" "build/$DEB_NAME"
           echo "[OK] .deb packaged"
