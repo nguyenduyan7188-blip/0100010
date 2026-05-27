@@ -5,6 +5,7 @@ package/
 # Dependencies (downloaded by CI)
 deps/
 !deps/substrate/
+!deps/substrate/*
 !deps/substrate/substrate.h
 !deps/substrate/substrate_stub.c
 librtmp/
@@ -21,3 +22,9 @@ librtmp/
 # IDE
 .vscode/
 .idea/
+
+# Python backend runtime
+backend/.env
+backend/data/
+backend/__pycache__/
+backend/*.pyc

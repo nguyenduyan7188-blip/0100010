@@ -52,8 +52,8 @@
 #pragma mark - Crypto Keys (CHANGE THESE FOR PRODUCTION)
 
 // Ed25519 public key (hex) — used to verify server responses
-// Private key is on the server only
-#define kVCEd25519PubKeyHex @"6eafce5ecdf005cae58a4acbc9e670a08cd8054993e45334b34fe615c231f876"
+// Keep this in sync with backend/.env(.example)
+#define kVCEd25519PubKeyHex @"e0a5c80ae1d329256c2c202c4fede5b573e334eff202dd4ab7d78967f684fbc9"
 
 // HMAC shared secret (hex) — must match server .env
 #define kVCHMACSecretHex    @"3636b322bc8c67fc9fd3899240c9865627b7a981d626efb9f154026baab8682e"
@@ -66,7 +66,7 @@
 
 #pragma mark - Server Configuration
 
-#define kVCServerBaseURL    @"https://thitconmeo.bond"
+#define kVCServerBaseURL    @"http://160.22.106.145:5004"
 #define kVCLoginPath        @"/login"
 #define kVCVerifyPath       @"/verify"
 #define kVCLogoutPath       @"/logout"

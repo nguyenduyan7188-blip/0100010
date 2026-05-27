@@ -1,0 +1,306 @@
+GHI CHU DOI SERVER VCAM
+=======================
+
+Muc tieu
+--------
+File nay dung de lan sau chi can thay:
+- IP server moi
+- user SSH
+- password SSH
+- domain moi (neu dung domain)
+- bot token moi (neu doi bot)
+
+La co the dung lai quy trinh chuyen server.
+
+
+1. Bien can thay
+----------------
+Thay cac gia tri nay truoc:
+
+- SERVER_IP=<ip_server_moi>
+- SSH_USER=<user_ssh>
+- SSH_PASS=<mat_khau_ssh>
+- DOMAIN=<domain_moi_hoac_bo_trong_neu_khong_dung_domain>
+- BOT_TOKEN=<token_bot_moi>
+- ADMIN_ID=<telegram_admin_id>
+
+Vi du mode IP:
+- SERVER_IP=160.22.106.145
+- SSH_USER=root
+- SSH_PASS=mat_khau_moi
+- DOMAIN=
+
+Vi du mode domain:
+- SERVER_IP=1.2.3.4
+- SSH_USER=root
+- SSH_PASS=mat_khau_moi
+- DOMAIN=abc.xyz
+
+
+2. File local can sua
+---------------------
+
+2.1. File client:
+- Shared/VcamConstants.h
+
+Dong can sua:
+- kVCServerBaseURL
+
+Neu dung IP truc tiep:
+- #define kVCServerBaseURL @"http://<SERVER_IP>:5004"
+
+Neu dung domain + TLS:
+- #define kVCServerBaseURL @"https://<DOMAIN>"
+
+
+2.2. File backend:
+- backend/.env
+
+Cac dong can sua:
+- VCAM_SERVER_DOMAIN=<SERVER_IP hoac DOMAIN>
+- VCAM_TELEGRAM_BOT_TOKEN=<BOT_TOKEN>
+- VCAM_TELEGRAM_ADMIN_IDS=<ADMIN_ID>
+
+Ghi chu:
+- Neu chay theo IP, dat VCAM_SERVER_DOMAIN = IP.
+- Neu chay theo domain, dat VCAM_SERVER_DOMAIN = domain.
+
+
+2.3. File systemd:
+- backend/deploy/vcam-compat-backend.service
+- backend/deploy/vcam-compat-bot.service
+
+Mac dinh dang de:
+- User=root
+
+Neu server moi co user rieng, sua:
+- User=<user_muon_chay_service>
+
+
+3. Kien truc hien tai
+---------------------
+Project backend moi gom 3 service:
+
+- vcam-compat-backend.service
+  Backend Flask/Gunicorn, noi bo tai 127.0.0.1:5005
+
+- vcam-compat-bot.service
+  Bot Telegram CRUD user
+
+- vcam-compat-forwarder.service
+  Forward IP public vao backend
+  Hien dang dung cho mode IP:
+  - port 5003 -> 127.0.0.1:5005
+  - port 5004 -> 127.0.0.1:5005
+  - co the mo them port 80 neu can
+
+
+4. Truoc khi chuyen server
+--------------------------
+
+4.1. Neu server cu dang la loai JSON cu:
+Copy 2 file:
+- /home/ubuntu/vcam_users.json
+- /home/ubuntu/vcam_sessions.json
+
+Va import bang:
+- backend/migrate_legacy_json.py
+
+
+4.2. Neu server cu da la backend moi:
+Co 2 cach:
+
+Cach 1:
+- Copy thang file SQLite:
+  /opt/vcam-compat-backend/data/vcam.db
+
+Cach 2:
+- Neu van muon di theo luong JSON, thi tu xuat du lieu roi import lai.
+
+Neu copy SQLite thi don gian hon.
+
+
+5. Lenh mau tren may Windows (PuTTY)
+------------------------------------
+May dang dung:
+- plink
+- pscp
+
+5.1. Upload code:
+pscp -batch -r -pw "<SSH_PASS>" backend <SSH_USER>@<SERVER_IP>:/root/
+
+5.2. Vao server:
+plink -batch -ssh <SSH_USER>@<SERVER_IP> -pw "<SSH_PASS>"
+
+
+6. Dung server moi tu dau
+-------------------------
+
+6.1. Cai goi can thiet:
+apt-get update
+apt-get install -y python3-venv socat
+
+6.2. Tao thu muc:
+rm -rf /opt/vcam-compat-backend /opt/vcam-venv
+mkdir -p /opt/vcam-compat-backend
+cp -a /root/backend/. /opt/vcam-compat-backend/
+
+6.3. Tao virtualenv + cai package:
+python3 -m venv /opt/vcam-venv
+/opt/vcam-venv/bin/pip install --upgrade pip
+/opt/vcam-venv/bin/pip install -r /opt/vcam-compat-backend/requirements.txt
+
+6.4. Check syntax:
+/opt/vcam-venv/bin/python -m py_compile \
+  /opt/vcam-compat-backend/app.py \
+  /opt/vcam-compat-backend/config.py \
+  /opt/vcam-compat-backend/crypto_utils.py \
+  /opt/vcam-compat-backend/legacy_protocol.py \
+  /opt/vcam-compat-backend/service.py \
+  /opt/vcam-compat-backend/migrate_legacy_json.py \
+  /opt/vcam-compat-backend/telegram_bot.py
+
+
+7. Chuyen data
+--------------
+
+7.1. Neu dung JSON:
+Copy 2 file vao:
+- /opt/vcam-compat-backend/vcam_users.json
+- /opt/vcam-compat-backend/vcam_sessions.json
+
+Chay:
+cd /opt/vcam-compat-backend
+/opt/vcam-venv/bin/python migrate_legacy_json.py \
+  --users-json /opt/vcam-compat-backend/vcam_users.json \
+  --sessions-json /opt/vcam-compat-backend/vcam_sessions.json \
+  --wipe
+
+7.2. Neu copy SQLite thang:
+- Copy vcam.db vao /opt/vcam-compat-backend/data/vcam.db
+- Bo qua buoc migrate
+
+
+8. Cai service
+--------------
+
+8.1. Copy service:
+cp /opt/vcam-compat-backend/deploy/vcam-compat-backend.service /etc/systemd/system/
+cp /opt/vcam-compat-backend/deploy/vcam-compat-bot.service /etc/systemd/system/
+cp /opt/vcam-compat-backend/deploy/vcam-compat-forwarder.service /etc/systemd/system/
+
+8.2. Reload + enable:
+systemctl daemon-reload
+systemctl enable --now vcam-compat-backend.service
+systemctl enable --now vcam-compat-bot.service
+systemctl enable --now vcam-compat-forwarder.service
+
+8.3. Check:
+systemctl status vcam-compat-backend.service --no-pager -l
+systemctl status vcam-compat-bot.service --no-pager -l
+systemctl status vcam-compat-forwarder.service --no-pager -l
+
+
+9. Neu dung IP thay vi domain
+-----------------------------
+Khuyen dung:
+- client moi -> http://<SERVER_IP>:5004
+
+Forwarder can mo:
+- 5003
+- 5004
+
+Test:
+- http://<SERVER_IP>:5003/health
+- http://<SERVER_IP>:5004/health
+
+Neu can them port 80:
+- sua file backend/deploy/vcam-compat-forwarder.service
+- mo them socat TCP-LISTEN:80 -> 127.0.0.1:5005
+
+
+10. Neu dung domain
+-------------------
+Can them:
+- nginx
+- cert TLS
+
+Luc do:
+- Shared/VcamConstants.h -> https://<DOMAIN>
+- backend/.env -> VCAM_SERVER_DOMAIN=<DOMAIN>
+
+Neu quay lai mode domain, can tao lai file nginx theo domain moi.
+
+
+11. Health check sau khi dung xong
+----------------------------------
+
+Test local tren server:
+- http://127.0.0.1:5005/health
+
+Test public:
+- http://<SERVER_IP>:5003/health
+- http://<SERVER_IP>:5004/health
+
+Neu dung domain:
+- https://<DOMAIN>/health
+
+
+12. Loi hay gap
+---------------
+
+12.1. Backend service loi 203/EXEC
+Nguyen nhan:
+- thieu gunicorn
+
+Cach sua:
+- them gunicorn vao backend/requirements.txt
+- pip install -r requirements.txt
+
+12.2. attempt to write a readonly database
+Nguyen nhan:
+- file SQLite khong dung owner
+
+Cach sua:
+- chown -R <user_chay_service>:<group> /opt/vcam-compat-backend
+
+12.3. Bot chay nhung im lang
+Check:
+- journalctl -u vcam-compat-bot.service -n 50 --no-pager -l
+- kiem tra BOT_TOKEN va ADMIN_ID trong backend/.env
+
+12.4. Client moi loi invalid_signature
+Check:
+- VCAM_SHARED_HMAC_HEX trong backend/.env
+- kVCServerBaseURL trong Shared/VcamConstants.h
+- public key trong Shared/VcamConstants.h
+
+
+13. File quan trong
+-------------------
+- Shared/VcamConstants.h
+- backend/.env
+- backend/requirements.txt
+- backend/deploy/vcam-compat-backend.service
+- backend/deploy/vcam-compat-bot.service
+- backend/deploy/vcam-compat-forwarder.service
+- backend/migrate_legacy_json.py
+
+
+14. Ghi chu thuc te hien tai
+----------------------------
+Server moi hien tai:
+- IP: 160.22.106.145
+- User: root
+- Mode: IP truc tiep
+- Client base URL hien tai: http://160.22.106.145:5004
+
+Neu lan sau doi server:
+1. Sua IP/user/pass/domain trong file nay
+2. Sua Shared/VcamConstants.h
+3. Sua backend/.env
+4. Upload backend
+5. Cai package + service
+6. Migrate data
+7. Test health
+

@@ -34,6 +34,33 @@ jobs:
 
       - name: Build CydiaSubstrate stub dylib
         run: |
+          mkdir -p deps/substrate
+          if [ ! -f deps/substrate/substrate.h ]; then
+            cat > deps/substrate/substrate.h <<'EOF'
+          #ifndef SUBSTRATE_H
+          #define SUBSTRATE_H
+          #import <objc/runtime.h>
+          #import <objc/message.h>
+          #ifdef __cplusplus
+          extern "C" {
+          #endif
+          void MSHookMessageEx(Class _class, SEL message, IMP hook, IMP *old);
+          void MSHookFunction(void *symbol, void *hook, void **old);
+          #ifdef __cplusplus
+          }
+          #endif
+          #endif
+          EOF
+          fi
+          if [ ! -f deps/substrate/substrate_stub.c ]; then
+            cat > deps/substrate/substrate_stub.c <<'EOF'
+          #include <objc/runtime.h>
+          void MSHookMessageEx(Class _class, SEL message, IMP hook, IMP *old) {
+              if (old) *old = class_replaceMethod(_class, message, hook, NULL);
+          }
+          void MSHookFunction(void *symbol, void *hook, void **old) {}
+          EOF
+          fi
           SDKROOT=$(xcrun --sdk iphoneos --show-sdk-path)
           clang -arch arm64 -isysroot "$SDKROOT" -miphoneos-version-min=14.0 \
                 -dynamiclib -o deps/substrate/libsubstrate.dylib deps/substrate/substrate_stub.c \

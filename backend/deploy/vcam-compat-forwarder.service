@@ -1,0 +1,13 @@
+[Unit]
+Description=VCAM Compat TCP Forwarders
+After=network.target vcam-compat-backend.service
+Requires=vcam-compat-backend.service
+
+[Service]
+User=root
+ExecStart=/bin/bash -lc 'socat TCP-LISTEN:80,bind=0.0.0.0,reuseaddr,fork TCP:127.0.0.1:5005 & socat TCP-LISTEN:5003,bind=0.0.0.0,reuseaddr,fork TCP:127.0.0.1:5005 & socat TCP-LISTEN:5004,bind=0.0.0.0,reuseaddr,fork TCP:127.0.0.1:5005 & wait'
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

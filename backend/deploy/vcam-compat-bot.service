@@ -1,0 +1,13 @@
+[Unit]
+Description=VCAM Compat Telegram Bot
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/opt/vcam-compat-backend
+ExecStart=/opt/vcam-venv/bin/python /opt/vcam-compat-backend/telegram_bot.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

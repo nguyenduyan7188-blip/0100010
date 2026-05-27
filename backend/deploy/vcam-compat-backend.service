@@ -1,0 +1,13 @@
+[Unit]
+Description=VCAM Compat Backend
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/opt/vcam-compat-backend
+ExecStart=/opt/vcam-venv/bin/python -m gunicorn --workers 2 --bind 127.0.0.1:5005 --timeout 30 app:app
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
