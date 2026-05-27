@@ -44,7 +44,7 @@ LIBRTMP_DIR="${LIBRTMP_DIR:-./librtmp}"
 CFLAGS="-arch ${ARCHS} -isysroot ${SDKROOT} -miphoneos-version-min=${MIN_IOS}"
 CFLAGS="${CFLAGS} -fobjc-arc -fmodules -O2 -Wall"
 LDFLAGS="-arch ${ARCHS} -isysroot ${SDKROOT} -miphoneos-version-min=${MIN_IOS}"
-LDFLAGS="${LDFLAGS} -dynamiclib -install_name /Library/MobileSubstrate/DynamicLibraries/"
+LDFLAGS="${LDFLAGS} -dynamiclib -install_name /var/jb/Library/MobileSubstrate/DynamicLibraries/"
 
 OUTDIR="./build"
 PKGDIR="./package"
@@ -82,7 +82,7 @@ build_daemon() {
     fi
 
     ${CC} ${CFLAGS} ${LDFLAGS} \
-        -install_name /Library/MobileSubstrate/DynamicLibraries/VcamLumiereDaemon.dylib \
+        -install_name /var/jb/Library/MobileSubstrate/DynamicLibraries/VcamLumiereDaemon.dylib \
         ${DAEMON_SRC} ${SHARED_SRC} ${RTMP_SRC} \
         ${DAEMON_FRAMEWORKS} \
         -lz \
@@ -119,7 +119,7 @@ build_ui() {
     UI_FRAMEWORKS="${UI_FRAMEWORKS} -framework CoreGraphics -framework QuartzCore"
 
     ${CC} ${CFLAGS} ${LDFLAGS} \
-        -install_name /Library/MobileSubstrate/DynamicLibraries/VcamLumiereUI.dylib \
+        -install_name /var/jb/Library/MobileSubstrate/DynamicLibraries/VcamLumiereUI.dylib \
         ${UI_SRC} ${SHARED_SRC} \
         ${UI_FRAMEWORKS} \
         -lsubstrate \
@@ -162,9 +162,9 @@ build_package() {
        "${STAGE}/var/jb/Library/MobileSubstrate/DynamicLibraries/"
 
     # Build .deb
-    dpkg-deb -Zxz --build "${STAGE}" "${OUTDIR}/com.lumiere.vcamlumiere_2.0.0_iphoneos-arm.deb"
+    dpkg-deb -Zxz --build "${STAGE}" "${OUTDIR}/com.lumiere.vcamlumiere_2.0.0_iphoneos-arm64.deb"
 
-    echo "  [OK] ${OUTDIR}/com.lumiere.vcamlumiere_2.0.0_iphoneos-arm.deb"
+    echo "  [OK] ${OUTDIR}/com.lumiere.vcamlumiere_2.0.0_iphoneos-arm64.deb"
     ls -la "${OUTDIR}/"*.deb
 }
 

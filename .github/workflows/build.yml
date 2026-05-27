@@ -13,6 +13,7 @@ on:
 env:
   PACKAGE_NAME: com.lumiere.vcamlumiere
   PACKAGE_VERSION: "2.0.0"
+  PACKAGE_ARCH: "iphoneos-arm64"
 
 jobs:
   build:
@@ -105,7 +106,7 @@ jobs:
           clang -arch arm64 -isysroot "$SDKROOT" -miphoneos-version-min=14.0 \
                 -fobjc-arc -fmodules -O2 -w \
                 -dynamiclib \
-                -install_name /Library/MobileSubstrate/DynamicLibraries/VcamLumiereDaemon.dylib \
+                -install_name /var/jb/Library/MobileSubstrate/DynamicLibraries/VcamLumiereDaemon.dylib \
                 -I"$SUBSTRATE_DIR" -I"$(pwd)" \
                 -L"$SUBSTRATE_DIR" -lsubstrate \
                 Daemon/Tweak.m Daemon/VCamManager.m Daemon/RTMPClient.m Daemon/H264Decoder.m \
@@ -129,7 +130,7 @@ jobs:
           clang -arch arm64 -isysroot "$SDKROOT" -miphoneos-version-min=14.0 \
                 -fobjc-arc -fmodules -O2 -w \
                 -dynamiclib \
-                -install_name /Library/MobileSubstrate/DynamicLibraries/VcamLumiereUI.dylib \
+                -install_name /var/jb/Library/MobileSubstrate/DynamicLibraries/VcamLumiereUI.dylib \
                 -I"$SUBSTRATE_DIR" -I"$(pwd)" \
                 -L"$SUBSTRATE_DIR" -lsubstrate \
                 UI/Tweak.m UI/VcamHelper.m UI/VcamLoginHelper.m \
@@ -161,7 +162,7 @@ jobs:
           chmod 755 "$STAGE/DEBIAN/postinst"
           echo 'SBReloadSpringBoard' > "$STAGE/DEBIAN/extrainst_"
           chmod 755 "$STAGE/DEBIAN/extrainst_"
-          DEB_NAME="${PACKAGE_NAME}_${PACKAGE_VERSION}_iphoneos-arm.deb"
+          DEB_NAME="${PACKAGE_NAME}_${PACKAGE_VERSION}_${PACKAGE_ARCH}.deb"
           dpkg-deb -Zxz --root-owner-group --build "$STAGE" "build/$DEB_NAME"
           echo "[OK] .deb packaged"
           ls -la build/*.deb
