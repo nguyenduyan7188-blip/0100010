@@ -14,6 +14,8 @@ env:
   PACKAGE_NAME: com.lumiere.vcamlumiere
   PACKAGE_VERSION: "2.0.0"
   PACKAGE_ARCH: "iphoneos-arm64"
+  ARCH_FLAGS: "-arch arm64 -arch arm64e"
+  MIN_IOS: "15.0"
 
 jobs:
   build:
@@ -63,7 +65,7 @@ jobs:
           EOF
           fi
           SDKROOT=$(xcrun --sdk iphoneos --show-sdk-path)
-          clang -arch arm64 -isysroot "$SDKROOT" -miphoneos-version-min=14.0 \
+          clang $ARCH_FLAGS -isysroot "$SDKROOT" -miphoneos-version-min=$MIN_IOS \
                 -dynamiclib -o deps/substrate/libsubstrate.dylib deps/substrate/substrate_stub.c \
                 -framework Foundation -install_name /usr/lib/libsubstrate.dylib
           echo "[OK] CydiaSubstrate stub built"
@@ -83,7 +85,7 @@ jobs:
             base=$(basename "$f" .c)
             case "$base" in hashswf|sslstub) echo "  skip $base"; continue;; esac
             echo "  compile $base.c"
-            clang -arch arm64 -isysroot "$SDKROOT" -miphoneos-version-min=14.0 \
+            clang $ARCH_FLAGS -isysroot "$SDKROOT" -miphoneos-version-min=$MIN_IOS \
                   -DNO_SSL -DNO_CRYPTO -w -O2 -c "$f" -o "build/obj/${base}.o"
           done
           echo "[OK] librtmp compiled ($(ls build/obj/*.o | wc -l) objects)"
@@ -103,7 +105,7 @@ jobs:
           mkdir -p build
           RTMP_OBJS=$(find build/obj -name "*.o" 2>/dev/null | tr '\n' ' ')
           echo "Linking with librtmp objects: $RTMP_OBJS"
-          clang -arch arm64 -isysroot "$SDKROOT" -miphoneos-version-min=14.0 \
+          clang $ARCH_FLAGS -isysroot "$SDKROOT" -miphoneos-version-min=$MIN_IOS \
                 -fobjc-arc -fmodules -O2 -w \
                 -dynamiclib \
                 -install_name /var/jb/Library/MobileSubstrate/DynamicLibraries/VcamLumiereDaemon.dylib \
@@ -127,7 +129,7 @@ jobs:
         run: |
           SDKROOT=$(xcrun --sdk iphoneos --show-sdk-path)
           SUBSTRATE_DIR="$(pwd)/deps/substrate"
-          clang -arch arm64 -isysroot "$SDKROOT" -miphoneos-version-min=14.0 \
+          clang $ARCH_FLAGS -isysroot "$SDKROOT" -miphoneos-version-min=$MIN_IOS \
                 -fobjc-arc -fmodules -O2 -w \
                 -dynamiclib \
                 -install_name /var/jb/Library/MobileSubstrate/DynamicLibraries/VcamLumiereUI.dylib \

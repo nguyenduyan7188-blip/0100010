@@ -1,7 +1,7 @@
 /**
  * Tweak.m — VcamLumiereDaemon main entry point.
  *
- * Injects into mediaserverd.
+ * Injects into camera-capable app processes.
  * Hooks:
  * 1. AVCaptureVideoDataOutput -setSampleBufferDelegate:queue:
  * 2. AVAssetWriterInput -appendSampleBuffer:
@@ -40,10 +40,25 @@ static origAppendPixel_t orig_appendPixelBuffer;
 
 // captureOutput:didOutputSampleBuffer:fromConnection:
 typedef void (*origCaptureOutput_t)(id, SEL, id, CMSampleBufferRef, id);
-static origCaptureOutput_t orig_captureOutput;
 
 // Track which delegate classes we've already hooked
 static NSMutableSet *hookedDelegateClasses = nil;
+static NSMutableDictionary<NSString *, NSValue *> *captureOutputIMPs = nil;
+
+static origCaptureOutput_t originalCaptureOutputForObject(id object) {
+    Class cls = object_getClass(object);
+    @synchronized (captureOutputIMPs) {
+        while (cls) {
+            NSString *className = NSStringFromClass(cls);
+            NSValue *impValue = captureOutputIMPs[className];
+            if (impValue) {
+                return (origCaptureOutput_t)[impValue pointerValue];
+            }
+            cls = class_getSuperclass(cls);
+        }
+    }
+    return NULL;
+}
 
 #pragma mark - Pixel Buffer Replacement
 
@@ -153,10 +168,15 @@ static void hooked_captureOutput(id self, SEL _cmd,
                                   id output,
                                   CMSampleBufferRef sampleBuffer,
                                   id connection) {
+    origCaptureOutput_t origCaptureOutput = originalCaptureOutputForObject(self);
+    if (!origCaptureOutput) {
+        return;
+    }
+
     VCamManager *mgr = [VCamManager sharedInstance];
 
     if (!mgr.isLive || !mgr.currentPixelBuffer) {
-        orig_captureOutput(self, _cmd, output, sampleBuffer, connection);
+        origCaptureOutput(self, _cmd, output, sampleBuffer, connection);
         return;
     }
 
@@ -165,14 +185,14 @@ static void hooked_captureOutput(id self, SEL _cmd,
         CVPixelBufferRef vcamBuf = mgr.currentPixelBuffer;
 
         if (!origBuf || !vcamBuf) {
-            orig_captureOutput(self, _cmd, output, sampleBuffer, connection);
+            origCaptureOutput(self, _cmd, output, sampleBuffer, connection);
             return;
         }
 
         // Create replacement pixel buffer (scaled/converted to match original)
         CVPixelBufferRef replacement = createReplacementBuffer(origBuf, vcamBuf);
         if (!replacement) {
-            orig_captureOutput(self, _cmd, output, sampleBuffer, connection);
+            origCaptureOutput(self, _cmd, output, sampleBuffer, connection);
             return;
         }
 
@@ -181,17 +201,17 @@ static void hooked_captureOutput(id self, SEL _cmd,
         CVPixelBufferRelease(replacement);
 
         if (!newSampleBuf) {
-            orig_captureOutput(self, _cmd, output, sampleBuffer, connection);
+            origCaptureOutput(self, _cmd, output, sampleBuffer, connection);
             return;
         }
 
         // Call original with our replaced buffer
-        orig_captureOutput(self, _cmd, output, newSampleBuf, connection);
+        origCaptureOutput(self, _cmd, output, newSampleBuf, connection);
         CFRelease(newSampleBuf);
 
     } @catch (NSException *e) {
         VCLog(@"captureOutput hook exception: %@", e);
-        orig_captureOutput(self, _cmd, output, sampleBuffer, connection);
+        origCaptureOutput(self, _cmd, output, sampleBuffer, connection);
     }
 }
 
@@ -211,9 +231,13 @@ static void hooked_setSampleBufferDelegate(id self, SEL _cmd,
                 SEL captureSel = @selector(captureOutput:didOutputSampleBuffer:fromConnection:);
 
                 if ([delegateClass instancesRespondToSelector:captureSel]) {
+                    IMP oldCaptureImp = NULL;
                     MSHookMessageEx(delegateClass, captureSel,
                                     (IMP)hooked_captureOutput,
-                                    (IMP *)&orig_captureOutput);
+                                    &oldCaptureImp);
+                    if (oldCaptureImp) {
+                        captureOutputIMPs[className] = [NSValue valueWithPointer:oldCaptureImp];
+                    }
                     [hookedDelegateClasses addObject:className];
                     VCLog(@"hooked captureOutput on %@", className);
                 }
@@ -274,9 +298,18 @@ __attribute__((constructor))
 static void vcam_daemon_init(void) {
     @autoreleasepool {
         NSString *process = [[NSProcessInfo processInfo] processName];
+        BOOL installedAnyHook = NO;
         VCLog(@"inject into %@", process);
 
         hookedDelegateClasses = [NSMutableSet set];
+        captureOutputIMPs = [NSMutableDictionary dictionary];
+
+        if ([process isEqualToString:@"SpringBoard"] ||
+            [process isEqualToString:@"mediaserverd"] ||
+            [process isEqualToString:@"backboardd"]) {
+            VCLog(@"skip camera hook bootstrap in %@", process);
+            return;
+        }
 
         // Hook 1: AVCaptureVideoDataOutput -setSampleBufferDelegate:queue:
         Class cls1 = objc_getClass("AVCaptureVideoDataOutput");
@@ -285,6 +318,7 @@ static void vcam_daemon_init(void) {
                             @selector(setSampleBufferDelegate:queue:),
                             (IMP)hooked_setSampleBufferDelegate,
                             (IMP *)&orig_setSampleBufferDelegate);
+            installedAnyHook = YES;
             VCLog(@"hooks installed (AVCaptureVideoDataOutput)");
         }
 
@@ -295,6 +329,7 @@ static void vcam_daemon_init(void) {
                             @selector(appendSampleBuffer:),
                             (IMP)hooked_appendSampleBuffer,
                             (IMP *)&orig_appendSampleBuffer);
+            installedAnyHook = YES;
             VCLog(@"hooks installed (AVAssetWriterInput)");
         }
 
@@ -305,7 +340,13 @@ static void vcam_daemon_init(void) {
                             @selector(appendPixelBuffer:withPresentationTime:),
                             (IMP)hooked_appendPixelBuffer,
                             (IMP *)&orig_appendPixelBuffer);
+            installedAnyHook = YES;
             VCLog(@"hooks installed (AVAssetWriterInputPixelBufferAdaptor)");
+        }
+
+        if (!installedAnyHook) {
+            VCLog(@"no AVFoundation hooks installed in %@", process);
+            return;
         }
 
         VCLog(@"hooks installed (AVFoundation) in %@", process);

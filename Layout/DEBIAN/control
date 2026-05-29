@@ -6,4 +6,4 @@ Description: Virtual camera tweak - inject RTMP stream into camera feed.
 Maintainer: LumierePhan
 Author: LumierePhan
 Section: Tweaks
-Depends: mobilesubstrate | substitute | libhooker
+Depends: firmware (>= 15.0), mobilesubstrate | substitute | libhooker

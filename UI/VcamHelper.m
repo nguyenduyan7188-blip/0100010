@@ -72,13 +72,83 @@
     return self;
 }
 
-#pragma mark - Window Setup
+#pragma mark - Scene / Presentation Helpers
 
-- (void)showFloatingButton {
+- (UIWindowScene *)_activeWindowScene {
+    if (@available(iOS 13.0, *)) {
+        for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+            if ([scene isKindOfClass:[UIWindowScene class]] &&
+                scene.activationState == UISceneActivationStateForegroundActive) {
+                return (UIWindowScene *)scene;
+            }
+        }
+        for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+            if ([scene isKindOfClass:[UIWindowScene class]]) {
+                return (UIWindowScene *)scene;
+            }
+        }
+    }
+    return nil;
+}
+
+- (UIWindow *)_frontmostWindow {
+    if (@available(iOS 13.0, *)) {
+        UIWindowScene *scene = [self _activeWindowScene];
+        for (UIWindow *window in scene.windows) {
+            if (window.isKeyWindow) {
+                return window;
+            }
+        }
+        return scene.windows.firstObject;
+    }
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    return [UIApplication sharedApplication].keyWindow ?: [UIApplication sharedApplication].windows.firstObject;
+#pragma clang diagnostic pop
+}
+
+- (UIViewController *)_presentationViewController {
+    UIViewController *rootVC = self.window.rootViewController;
+    if (!rootVC) {
+        rootVC = [self _frontmostWindow].rootViewController;
+    }
+    while (rootVC.presentedViewController) {
+        rootVC = rootVC.presentedViewController;
+    }
+    return rootVC;
+}
+
+- (void)_ensureWindow {
     if (self.window) return;
 
     CGRect screenBounds = [UIScreen mainScreen].bounds;
-    self.window = [[VcamPassthroughWindow alloc] initWithFrame:screenBounds];
+    if (@available(iOS 13.0, *)) {
+        UIWindowScene *scene = [self _activeWindowScene];
+        if (scene) {
+            self.window = [[VcamPassthroughWindow alloc] initWithWindowScene:scene];
+            self.window.frame = screenBounds;
+        } else {
+            self.window = [[VcamPassthroughWindow alloc] initWithFrame:screenBounds];
+        }
+    } else {
+        self.window = [[VcamPassthroughWindow alloc] initWithFrame:screenBounds];
+    }
+
+    self.window.rootViewController = [UIViewController new];
+    self.window.rootViewController.view.backgroundColor = [UIColor clearColor];
+    self.window.rootViewController.view.userInteractionEnabled = NO;
+    self.window.hidden = NO;
+}
+
+#pragma mark - Window Setup
+
+- (void)showFloatingButton {
+    if (self.floatButton) return;
+
+    [self _ensureWindow];
+
+    CGRect screenBounds = self.window.bounds;
 
     // Create floating button
     CGFloat btnSize = 50;
@@ -407,6 +477,8 @@
         return;
     }
 
+    [self _ensureWindow];
+
     UIAlertController *alert = [UIAlertController
         alertControllerWithTitle:@"Login @lumierephan"
                          message:nil
@@ -453,16 +525,12 @@
                           spinner:spinner];
     }]];
 
-    // Present from key window
-    UIWindow *keyWindow = nil;
-    for (UIWindow *w in [UIApplication sharedApplication].windows) {
-        if (w.isKeyWindow) { keyWindow = w; break; }
+    UIViewController *presenter = [self _presentationViewController];
+    if (!presenter) {
+        VCLog(@"Unable to find presenter for login alert");
+        return;
     }
-    UIViewController *rootVC = keyWindow.rootViewController;
-    while (rootVC.presentedViewController) {
-        rootVC = rootVC.presentedViewController;
-    }
-    [rootVC presentViewController:alert animated:YES completion:nil];
+    [presenter presentViewController:alert animated:YES completion:nil];
 }
 
 #pragma mark - VcamLoginDelegate
@@ -498,11 +566,10 @@
         [self showLoginAlert];
     }]];
 
-    UIWindow *keyWindow = nil;
-    for (UIWindow *w in [UIApplication sharedApplication].windows) {
-        if (w.isKeyWindow) { keyWindow = w; break; }
+    UIViewController *presenter = [self _presentationViewController];
+    if (presenter) {
+        [presenter presentViewController:alert animated:YES completion:nil];
     }
-    [keyWindow.rootViewController presentViewController:alert animated:YES completion:nil];
 }
 
 #pragma mark - VcamVolumeObserverDelegate

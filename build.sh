@@ -22,8 +22,8 @@ set -e
 
 # ── Configuration ──────────────────────────────────────────────────────
 
-ARCHS="arm64"
-MIN_IOS="14.0"
+ARCHS="${ARCHS:-arm64 arm64e}"
+MIN_IOS="${MIN_IOS:-15.0}"
 SDK_VER="16.4"
 
 # Auto-detect SDK
@@ -40,10 +40,15 @@ CC="clang"
 SUBSTRATE_DIR="${SUBSTRATE_DIR:-/var/jb/Library/Frameworks/CydiaSubstrate.framework}"
 LIBRTMP_DIR="${LIBRTMP_DIR:-./librtmp}"
 
+ARCH_FLAGS=""
+for arch in ${ARCHS}; do
+    ARCH_FLAGS="${ARCH_FLAGS} -arch ${arch}"
+done
+
 # Common flags
-CFLAGS="-arch ${ARCHS} -isysroot ${SDKROOT} -miphoneos-version-min=${MIN_IOS}"
+CFLAGS="${ARCH_FLAGS} -isysroot ${SDKROOT} -miphoneos-version-min=${MIN_IOS}"
 CFLAGS="${CFLAGS} -fobjc-arc -fmodules -O2 -Wall"
-LDFLAGS="-arch ${ARCHS} -isysroot ${SDKROOT} -miphoneos-version-min=${MIN_IOS}"
+LDFLAGS="${ARCH_FLAGS} -isysroot ${SDKROOT} -miphoneos-version-min=${MIN_IOS}"
 LDFLAGS="${LDFLAGS} -dynamiclib -install_name /var/jb/Library/MobileSubstrate/DynamicLibraries/"
 
 OUTDIR="./build"
